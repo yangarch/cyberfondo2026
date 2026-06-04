@@ -23,10 +23,14 @@ USER_AGENTS = [
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
 ]
 
-# 본문 첫 줄 유효성 검사 + 데이터 추출 (project.md §3 지정 패턴)
+# 본문 첫 줄 유효성 검사 + 데이터 추출
+# 시간 형식: H:MM / H:MM:SS / 7시간54분 / 7시간54분30초
 FIRST_LINE_REGEX = re.compile(
     r'^로싸\s*산레모[\s,]+'
-    r'(?P<time>\d{1,2}[:시간\s]+\d{1,2}[분\s]*(?:\d{1,2}초?)?)'
+    r'(?P<time>'
+    r'\d{1,2}:\d{2}(?::\d{2})?'                    # H:MM 또는 H:MM:SS
+    r'|\d{1,2}시간\s*\d{1,2}분(?:\s*\d{1,2}초?)?'  # 한글: 7시간54분(30초)
+    r')'
     r'[\s,]+'
     r'(?P<dist>\d+(?:\.\d+)?)[km\s,]*'
     r'(?P<ele>\d+)[m\s]*',
