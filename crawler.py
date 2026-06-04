@@ -203,7 +203,9 @@ class DCICrawler:
         body_text = body_el.get_text(separator='\n', strip=True) if body_el else ""
 
         # 첫 줄 유효성 검사 + 데이터 추출
-        first_line = next((l.strip() for l in body_text.splitlines() if l.strip()), "")
+        # 디시 에디터가 줄바꿈을 삽입할 수 있으므로 첫 3줄을 공백으로 이어붙여 매칭
+        non_empty = [l.strip() for l in body_text.splitlines() if l.strip()]
+        first_line = ' '.join(non_empty[:3])
         print(f"  [첫줄] {repr(first_line)}")
         m = FIRST_LINE_REGEX.match(first_line)
         if not m:
