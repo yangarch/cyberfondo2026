@@ -20,7 +20,9 @@ from sheets_manager import SheetsManager
 def load_seen() -> set[str]:
     if os.path.exists(SEEN_POSTS_FILE):
         with open(SEEN_POSTS_FILE, "r", encoding="utf-8") as f:
-            return set(json.load(f))
+            content = f.read().strip()
+            if content:
+                return set(json.loads(content))
     return set()
 
 
