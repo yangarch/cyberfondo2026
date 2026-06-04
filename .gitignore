@@ -1,0 +1,30 @@
+# 인증 관련 (절대 커밋 금지)
+credentials.json
+token.json
+service_account.json
+*.json.bak
+
+# 환경 변수
+.env
+
+# 크롤러 상태 파일
+seen_posts.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+
+# 로그
+*.log
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
