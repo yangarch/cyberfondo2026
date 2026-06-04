@@ -204,8 +204,10 @@ class DCICrawler:
 
         # 첫 줄 유효성 검사 + 데이터 추출
         first_line = next((l.strip() for l in body_text.splitlines() if l.strip()), "")
+        print(f"  [첫줄] {repr(first_line)}")
         m = FIRST_LINE_REGEX.match(first_line)
         if not m:
+            print(f"  [스킵] 패턴 불일치")
             return None  # 대회 참가 글 아님
 
         ride_time = _normalize_time(m.group('time'))
