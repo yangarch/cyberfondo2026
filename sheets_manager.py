@@ -67,11 +67,12 @@ class SheetsManager:
         all_rows = self.ws.get_all_values()
         next_row = max(len(all_rows) + 1, 2)
 
+        # 거리: 200m당 1점 (1km=5점), 획고: 10m당 2점 (1m=0.2점)
         score_formula = (
             f'=IF(J{next_row}="완료",'
             f'IF(F{next_row}*1440<=480,'
-            f'(F{next_row}*24)*((G{next_row}*10)+(H{next_row}*0.2)),'
-            f'8*((G{next_row}*10)+(H{next_row}*0.2))),0)'
+            f'(F{next_row}*24)*((G{next_row}*5)+(H{next_row}*0.2)),'
+            f'8*((G{next_row}*5)+(H{next_row}*0.2))),0)'
         )
 
         safe_title    = title.replace('"', "'")
