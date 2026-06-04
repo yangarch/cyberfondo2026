@@ -146,6 +146,13 @@ class DCICrawler:
         posts = []
 
         for row in soup.select('tr.ub-content'):
+            # 공지글 스킵 (notice 클래스 또는 글번호가 숫자가 아닌 경우)
+            if 'notice' in row.get('class', []):
+                continue
+            num_cell = row.select_one('td.gall_num')
+            if num_cell and not num_cell.get_text(strip=True).isdigit():
+                continue
+
             title_cell = row.select_one('td.gall_tit a')
             if not title_cell:
                 continue
