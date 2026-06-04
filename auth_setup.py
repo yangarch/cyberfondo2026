@@ -24,8 +24,9 @@ AUTHORIZED_USER_FILE = "token.json"
 def main():
     flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
 
-    # run_console(): 브라우저 없이 URL + 코드 붙여넣기 방식으로 인증
-    creds = flow.run_console()
+    # Mac/로컬 환경: 브라우저 자동 오픈
+    # 서버(브라우저 없음): credentials.json + token.json 을 직접 복사할 것
+    creds = flow.run_local_server(port=0)
 
     # token.json 저장
     token_data = {
