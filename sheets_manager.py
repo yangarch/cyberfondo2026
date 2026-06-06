@@ -63,9 +63,9 @@ class SheetsManager:
         다음 빈 행에 게시글 데이터를 적재.
         I열에 점수 수식 자동 삽입, B열에 HYPERLINK 수식 삽입.
         """
-        # 다음 빈 행 번호 계산 (헤더가 1행이면 데이터는 2행부터)
-        all_rows = self.ws.get_all_values()
-        next_row = max(len(all_rows) + 1, 2)
+        # K열(원글 링크)은 크롤러만 채우므로 드롭다운 사전 설정에 영향받지 않음
+        k_values = self.ws.col_values(11)  # K = 11번째 열
+        next_row = max(len(k_values) + 1, 2)
 
         # 시트 행 한도 초과 시 자동 확장
         if next_row > self.ws.row_count:
