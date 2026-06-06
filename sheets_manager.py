@@ -67,6 +67,11 @@ class SheetsManager:
         all_rows = self.ws.get_all_values()
         next_row = max(len(all_rows) + 1, 2)
 
+        # 시트 행 한도 초과 시 자동 확장
+        if next_row > self.ws.row_count:
+            self.ws.add_rows(500)
+            print(f"  [시트] 행 500개 자동 추가 (현재 {self.ws.row_count}행)")
+
         # 거리: 200m당 1점 (1km=5점), 획고: 10m당 2점 (1m=0.2점)
         score_formula = (
             f'=IF(J{next_row}="완료",'
