@@ -40,7 +40,7 @@ FIRST_LINE_REGEX = re.compile(
 )
 
 STRAVA_REGEX = re.compile(
-    r'https?://(?:www\.)?strava\.com/activities/\d+'
+    r'https?://\S*strava\S+'
 )
 
 SENSOR_KEYWORDS = ['심박', '파워', '케이던스', '속도', 'power', 'heart rate', 'cadence', 'bpm', 'rpm', 'w/kg', 'watt']
