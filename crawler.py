@@ -24,16 +24,18 @@ USER_AGENTS = [
 ]
 
 # 본문 첫 줄 유효성 검사 + 데이터 추출
-# 시간 형식: H:MM / H:MM:SS / 7시간54분 / 7시간54분30초
+# 시간 형식: H:MM / H:MM:SS / 9h07m58s / 7시간54분 / 7시간54분30초
+# 구분자: 공백, 쉼표, 슬래시 허용
 FIRST_LINE_REGEX = re.compile(
     r'^로싸\s*산레모[\s,]+'
     r'(?P<time>'
     r'\d{1,2}:\d{2}(?::\d{2})?'                    # H:MM 또는 H:MM:SS
-    r'|\d{1,2}시간\s*\d{1,2}분(?:\s*\d{1,2}초?)?'  # 한글: 7시간54분(30초)
+    r'|\d{1,2}h\s*\d{1,2}m(?:\s*\d{1,2}s)?'        # 9h 07m 58s
+    r'|\d{1,2}시간\s*\d{1,2}분(?:\s*\d{1,2}초?)?'  # 7시간54분(30초)
     r')'
-    r'[\s,]+'
-    r'(?P<dist>\d+(?:\.\d+)?)[km\s,]*'
-    r'(?P<ele>\d+)[m\s]*',
+    r'[\s,/]+'
+    r'(?P<dist>\d+(?:\.\d+)?)\s*k?m?[\s,/]+'
+    r'(?P<ele>\d+)\s*m?',
     re.IGNORECASE
 )
 
@@ -61,10 +63,10 @@ def _normalize_time(raw: str) -> str:
         h, mi, s = int(m.group(1)), int(m.group(2)), int(m.group(3) or 0)
         return f"{h:02d}:{mi:02d}:{s:02d}"
 
-    # 한글 단위 치환 후 파싱
-    t = re.sub(r'시간', ':', t)
-    t = re.sub(r'분', ':', t)
-    t = re.sub(r'초', '', t)
+    # 영문/한글 단위 치환 후 파싱
+    t = re.sub(r'시간|h', ':', t, flags=re.IGNORECASE)
+    t = re.sub(r'분|m', ':', t, flags=re.IGNORECASE)
+    t = re.sub(r'초|s', '', t, flags=re.IGNORECASE)
     t = re.sub(r'\s+', '', t).strip(':')
 
     parts = [p for p in t.split(':') if p.isdigit()]
