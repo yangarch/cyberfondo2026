@@ -11,6 +11,7 @@ import time
 from config import (
     GALLERY_TYPE, GALLERY_ID, GALLERY_SUBJECT,
     SPREADSHEET_ID, WORKSHEET_NAME,
+    GEMINI_API_KEY,
     SEEN_POSTS_FILE, MIN_DELAY, MAX_DELAY, MAX_PAGES, POLL_INTERVAL,
 )
 from crawler import DCICrawler
@@ -88,6 +89,7 @@ def main():
         gallery_subject=GALLERY_SUBJECT,
         min_delay=MIN_DELAY,
         max_delay=MAX_DELAY,
+        gemini_api_key=GEMINI_API_KEY,
     )
     sheets = SheetsManager(
         spreadsheet_id=SPREADSHEET_ID,

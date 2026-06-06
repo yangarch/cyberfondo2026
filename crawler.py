@@ -10,6 +10,8 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 
+import google.generativeai as genai
+
 # ---------------------------------------------------------------------------
 # 상수
 # ---------------------------------------------------------------------------
@@ -44,6 +46,33 @@ STRAVA_REGEX = re.compile(
 )
 
 SENSOR_KEYWORDS = ['심박', '파워', '케이던스', '속도', 'power', 'heart rate', 'cadence', 'bpm', 'rpm', 'w/kg', 'watt']
+
+_gemini_model = None
+
+def _init_gemini(api_key: str):
+    global _gemini_model
+    if api_key and _gemini_model is None:
+        genai.configure(api_key=api_key)
+        _gemini_model = genai.GenerativeModel("gemini-2.0-flash-lite")
+
+def _summarize(text: str) -> str:
+    """Gemini로 사연 요약. API 키 없거나 내용 없으면 원문 200자 반환."""
+    if not text.strip():
+        return ""
+    if _gemini_model is None:
+        return text[:197] + "..." if len(text) > 200 else text
+    try:
+        prompt = (
+            "다음은 디시인사이드 로드싸이클 갤러리 유저가 대회 후기로 쓴 글이야. "
+            "디씨 특유의 거칠고 솔직한 말투와 감성을 살려서 핵심 사연만 2문장 이내로 요약해. "
+            "요약문만 출력하고 다른 말은 하지 마.\n\n"
+            f"{text}"
+        )
+        resp = _gemini_model.generate_content(prompt)
+        return resp.text.strip()
+    except Exception as e:
+        print(f"  [Gemini] 요약 실패: {e}")
+        return text[:197] + "..." if len(text) > 200 else text
 
 
 # ---------------------------------------------------------------------------
@@ -95,13 +124,14 @@ def _format_date(raw: str) -> str:
 
 class DCICrawler:
     def __init__(self, gallery_type: str, gallery_id: str, gallery_subject: str,
-                 min_delay: float, max_delay: float):
+                 min_delay: float, max_delay: float, gemini_api_key: str = ""):
         self.gallery_type    = gallery_type
         self.gallery_id      = gallery_id
         self.gallery_subject = gallery_subject
         self.min_delay       = min_delay
         self.max_delay       = max_delay
         self.session         = requests.Session()
+        _init_gemini(gemini_api_key)
 
     # ---- 내부 유틸 --------------------------------------------------------
 
@@ -245,10 +275,10 @@ class DCICrawler:
         body_lower = body_text.lower()
         sensor = "O" if any(kw in body_lower for kw in SENSOR_KEYWORDS) else ""
 
-        # 사연 (데이터 헤더 줄·스트라바 URL 제외 나머지)
-        # 패턴 매칭에 사용한 줄 수(최대 3)만큼 건너뜀
+        # 사연: 헤더·스트라바 URL 제외 후 Gemini 요약
         header_lines = min(3, len(non_empty))
-        story = self._extract_story(non_empty, header_lines)
+        raw_story = self._extract_story(non_empty, header_lines)
+        story = _summarize(raw_story)
 
         return {
             "nickname":   nickname,
