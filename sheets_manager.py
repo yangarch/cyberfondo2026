@@ -94,7 +94,7 @@ class SheetsManager:
             data["distance"],            # G 거리 km
             data["elevation"],           # H 획고 m
             score_formula,               # I 점수
-            "",                          # J 검증
+            "미완료",                     # J 검증
             post_url,                    # K 원글 링크
             data["strava_url"],          # L 스트라바 링크
             data["sensor"],              # M 센서
