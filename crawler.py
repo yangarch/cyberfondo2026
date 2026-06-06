@@ -245,8 +245,10 @@ class DCICrawler:
         body_lower = body_text.lower()
         sensor = "O" if any(kw in body_lower for kw in SENSOR_KEYWORDS) else ""
 
-        # 사연 (첫 줄 · 스트라바 URL 제외 나머지)
-        story = self._extract_story(body_text, first_line)
+        # 사연 (데이터 헤더 줄·스트라바 URL 제외 나머지)
+        # 패턴 매칭에 사용한 줄 수(최대 3)만큼 건너뜀
+        header_lines = min(3, len(non_empty))
+        story = self._extract_story(non_empty, header_lines)
 
         return {
             "nickname":   nickname,
@@ -260,19 +262,10 @@ class DCICrawler:
             "story":      story,
         }
 
-    def _extract_story(self, body_text: str, first_line: str) -> str:
-        lines = [l.strip() for l in body_text.splitlines() if l.strip()]
-        story_lines = []
-        skip = True
-
-        for line in lines:
-            if skip:
-                if line == first_line:
-                    skip = False
-                continue
-            if STRAVA_REGEX.search(line):
-                continue
-            story_lines.append(line)
-
+    def _extract_story(self, non_empty: list[str], header_lines: int) -> str:
+        story_lines = [
+            line for line in non_empty[header_lines:]
+            if not STRAVA_REGEX.search(line)
+        ]
         story = ' '.join(story_lines)
         return story[:197] + "..." if len(story) > 200 else story
