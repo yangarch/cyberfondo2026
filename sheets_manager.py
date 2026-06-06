@@ -73,11 +73,12 @@ class SheetsManager:
             print(f"  [시트] 행 500개 자동 추가 (현재 {self.ws.row_count}행)")
 
         # 거리: 200m당 1점 (1km=5점), 획고: 10m당 2점 (1m=0.2점)
+        # 8시간 초과 시 (8시간/실제시간) 비례 차감
         score_formula = (
             f'=IF(J{next_row}="완료",'
             f'IF(F{next_row}*1440<=480,'
-            f'(F{next_row}*24)*((G{next_row}*5)+(H{next_row}*0.2)),'
-            f'8*((G{next_row}*5)+(H{next_row}*0.2))),0)'
+            f'(G{next_row}*5)+(H{next_row}*0.2),'
+            f'((G{next_row}*5)+(H{next_row}*0.2))*(480/(F{next_row}*1440))),0)'
         )
 
         safe_title    = title.replace('"', "'")
