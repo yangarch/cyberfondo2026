@@ -72,13 +72,10 @@ class SheetsManager:
             self.ws.add_rows(500)
             print(f"  [시트] 행 500개 자동 추가 (현재 {self.ws.row_count}행)")
 
-        # 거리: 200m당 1점 (1km=5점), 획고: 10m당 2점 (1m=0.2점)
-        # 8시간 초과 시 (8시간/실제시간) 비례 차감
+        # 총 시간(h) × (거리 200m당 1점 + 획고 10m당 2점)
         score_formula = (
             f'=IF(J{next_row}="완료",'
-            f'IF(F{next_row}*1440<=480,'
-            f'(G{next_row}*5)+(H{next_row}*0.2),'
-            f'((G{next_row}*5)+(H{next_row}*0.2))*(480/(F{next_row}*1440))),0)'
+            f'F{next_row}*24*(G{next_row}*5+H{next_row}*0.2),0)'
         )
 
         safe_title    = title.replace('"', "'")
@@ -108,3 +105,25 @@ class SheetsManager:
             value_input_option="USER_ENTERED",
         )
         print(f"  [시트] 행 {next_row} 적재 완료: {title[:40]}")
+
+    def update_score_formulas(self, start_row: int = 4):
+        """기존 행의 점수 수식을 새 기준(총시간×점수)으로 일괄 업데이트."""
+        k_values = self.ws.col_values(11)  # K열 기준 마지막 행 탐색
+        end_row = len(k_values)
+
+        if end_row < start_row:
+            print(f"[업데이트] {start_row}행 이후 데이터 없음.")
+            return
+
+        updates = [
+            {
+                "range": f"I{row}",
+                "values": [[
+                    f'=IF(J{row}="완료",F{row}*24*(G{row}*5+H{row}*0.2),0)'
+                ]],
+            }
+            for row in range(start_row, end_row + 1)
+        ]
+
+        self.ws.batch_update(updates, value_input_option="USER_ENTERED")
+        print(f"[업데이트] {start_row}~{end_row}행 점수 수식 {len(updates)}개 완료")
