@@ -72,13 +72,13 @@ class SheetsManager:
             self.ws.add_rows(500)
             print(f"  [시트] 행 500개 자동 추가 (현재 {self.ws.row_count}행)")
 
-        # 8시간 이하: 총 시간(h) × (거리 200m당 1점 + 획고 10m당 2점)
-        # 8시간 초과: 8 × (거리 200m당 1점 + 획고 10m당 2점) 비례 차감
+        # 8시간 이하: 총 시간(분) × (거리 1km당 5점 + 획고 1m당 0.2점)
+        # 8시간 초과: 480분 기준으로 고정 (사실상 8시간에서 끊은 것과 동일)
         score_formula = (
             f'=IF(J{next_row}="완료",'
             f'IF(F{next_row}*1440<=480,'
-            f'F{next_row}*24*(G{next_row}*5+H{next_row}*0.2),'
-            f'8*(G{next_row}*5+H{next_row}*0.2)),0)'
+            f'F{next_row}*1440*(G{next_row}*5+H{next_row}*0.2),'
+            f'480*(G{next_row}*5+H{next_row}*0.2)),0)'
         )
 
         safe_title    = title.replace('"', "'")
@@ -122,7 +122,7 @@ class SheetsManager:
             {
                 "range": f"I{row}",
                 "values": [[
-                    f'=IF(J{row}="완료",IF(F{row}*1440<=480,F{row}*24*(G{row}*5+H{row}*0.2),8*(G{row}*5+H{row}*0.2)),0)'
+                    f'=IF(J{row}="완료",IF(F{row}*1440<=480,F{row}*1440*(G{row}*5+H{row}*0.2),480*(G{row}*5+H{row}*0.2)),0)'
                 ]],
             }
             for row in range(start_row, end_row + 1)
