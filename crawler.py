@@ -33,17 +33,18 @@ USER_AGENTS = [
 # 사이버-폰도(하이픈), [사이버폰도](대괄호) 표기 허용
 # 첫 번째 시간 뒤 두 번째 시간(이동시간 등) 건너뜀: /45:30:38, (이동: 6:30), 이동6:30
 # 거리·고도 값의 천단위 콤마 표기(1,011 등) 허용 (매칭 후 콤마 제거해서 사용)
+# 시간/거리/고도 값마다 개별 대괄호로 감싸는 표기([ 7:00:13 ] [152.79] [2,077]) 허용
 FIRST_LINE_REGEX = re.compile(
     r'^\[?\s*(?:사이버|싸이버)\s*[-]?\s*(?:그란\s*[-]?\s*)?폰도\s*\]?[\s,]+'
-    r'(?P<time>'
+    r'\[?\s*(?P<time>'
     r'\d+:\d{2}(?::\d{2})?'                         # H:MM 또는 H:MM:SS (자릿수 제한 없음)
     r'|\d+h\s*\d{1,2}m(?:\s*\d{1,2}s)?'             # 9h07m58s (시간 자릿수 제한 없음)
     r'|\d{1,2}시간\s*\d{1,2}분(?:\s*\d{1,2}초?)?'  # 7시간54분(30초)
-    r')'
+    r')\s*\]?'
     r'(?:[\s,/]*\(?\s*(?:이동[:\s]*)?\d+:\d{2}(?::\d{2})?\s*\)?)?'  # 두 번째 시간값 건너뜀
     r'[\s,/]+'
-    r'(?P<dist>\d+(?:,\d{3})*(?:\.\d+)?)\s*k?m?[\s,/]+'
-    r'(?P<ele>\d+(?:,\d{3})*)\s*m?',
+    r'\[?\s*(?P<dist>\d+(?:,\d{3})*(?:\.\d+)?)\s*k?m?\s*\]?[\s,/]+'
+    r'\[?\s*(?P<ele>\d+(?:,\d{3})*)\s*m?\s*\]?',
     re.IGNORECASE
 )
 
@@ -324,10 +325,13 @@ class DCICrawler:
 
     def _extract_story(self, non_empty: list[str], header_lines: int) -> str:
         # URL 자체뿐 아니라, 링크를 붙였을 때 에디터가 자동 생성하는
-        # 미리보기 카드(제목·설명·도메인)도 실제 사연이 아니므로 함께 제외
+        # 미리보기 카드(제목·설명·도메인)도 실제 사연이 아니므로 함께 제외.
+        # 값마다 대괄호로 감싼 글에서 헤더 뒤에 남는 짝 잃은 괄호 잔여 줄(예: ']')도 제외.
         story_lines = [
             line for line in non_empty[header_lines:]
-            if not STRAVA_REGEX.search(line) and 'strava' not in line.lower()
+            if not STRAVA_REGEX.search(line)
+            and 'strava' not in line.lower()
+            and line.strip('[]() ')
         ]
         story = ' '.join(story_lines)
         return story[:197] + "..." if len(story) > 200 else story
