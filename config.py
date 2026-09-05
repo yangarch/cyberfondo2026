@@ -7,7 +7,7 @@ GALLERY_TYPE    = os.getenv("GALLERY_TYPE", "board")
 GALLERY_ID      = os.getenv("GALLERY_ID", "roadcycle")
 GALLERY_SUBJECT = os.getenv("GALLERY_SUBJECT", "")      # 탭(말머리) 필터, 빈 문자열이면 전체
 
-SPREADSHEET_ID = os.getenv("SPREADSHEET_ID", "1cfKsH8EtWv3fDka4lfdF5t9WHlZvS7oY19ZdYcifYDY")
+SPREADSHEET_ID = os.getenv("SPREADSHEET_ID", "1mL8nREeFo_YBvUjQC5XzJ3lo-Q_nwR9oFne7d8YDh6s")
 WORKSHEET_NAME = os.getenv("WORKSHEET_NAME", "시트1")
 
 GEMINI_API_KEY  = os.getenv("GEMINI_API_KEY", "")

@@ -1,5 +1,5 @@
 """
-RoCyg-Sanremo 데이터 파이프라인 메인 루프.
+CyberFondo 데이터 파이프라인 메인 루프.
 Supervisor에 의해 관리되며, 갤러리를 주기적으로 스캔하여 신규 참가 기록을 시트에 적재함.
 """
 
@@ -88,7 +88,7 @@ def main():
     args = parser.parse_args()
 
     print("=" * 50)
-    print("  RoCyg-Sanremo 데이터 파이프라인 시작")
+    print("  CyberFondo 데이터 파이프라인 시작")
     if args.once:
         print(f"  [딥스캔 모드] 최대 {args.pages}페이지, 1회 후 종료")
     print("=" * 50)
