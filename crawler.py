@@ -32,6 +32,7 @@ USER_AGENTS = [
 # (사이버폰도, 싸이버폰도, 사이버 그란폰도, 싸이버그란폰도 등)
 # 사이버-폰도(하이픈), [사이버폰도](대괄호) 표기 허용
 # 첫 번째 시간 뒤 두 번째 시간(이동시간 등) 건너뜀: /45:30:38, (이동: 6:30), 이동6:30
+# 거리·고도 값의 천단위 콤마 표기(1,011 등) 허용 (매칭 후 콤마 제거해서 사용)
 FIRST_LINE_REGEX = re.compile(
     r'^\[?\s*(?:사이버|싸이버)\s*[-]?\s*(?:그란\s*[-]?\s*)?폰도\s*\]?[\s,]+'
     r'(?P<time>'
@@ -41,8 +42,8 @@ FIRST_LINE_REGEX = re.compile(
     r')'
     r'(?:[\s,/]*\(?\s*(?:이동[:\s]*)?\d+:\d{2}(?::\d{2})?\s*\)?)?'  # 두 번째 시간값 건너뜀
     r'[\s,/]+'
-    r'(?P<dist>\d+(?:\.\d+)?)\s*k?m?[\s,/]+'
-    r'(?P<ele>\d+)\s*m?',
+    r'(?P<dist>\d+(?:,\d{3})*(?:\.\d+)?)\s*k?m?[\s,/]+'
+    r'(?P<ele>\d+(?:,\d{3})*)\s*m?',
     re.IGNORECASE
 )
 
@@ -51,6 +52,10 @@ STRAVA_REGEX = re.compile(
 )
 
 SENSOR_KEYWORDS = ['심박', '파워', '케이던스', '속도', 'power', 'heart rate', 'cadence', 'bpm', 'rpm', 'w/kg', 'watt']
+
+# 대회명/시간/거리/고도가 한 줄에 다 몰려 있는 경우부터, 값마다 줄바꿈된 경우까지
+# 흡수하기 위해 앞쪽 몇 줄을 첫 줄 정규식 매칭 후보로 봄
+HEADER_WINDOW_LINES = 6
 
 _gemini_model = None
 
@@ -240,9 +245,11 @@ class DCICrawler:
         body_text = body_el.get_text(separator='\n', strip=True) if body_el else ""
 
         # 첫 줄 유효성 검사 + 데이터 추출
-        # 디시 에디터가 줄바꿈을 삽입할 수 있으므로 첫 3줄을 공백으로 이어붙여 매칭
+        # 디시 에디터가 값마다 줄바꿈을 삽입할 수 있으므로(대회명/시간/거리/고도가
+        # 각각 다른 줄일 수 있음) 앞쪽 여러 줄을 공백으로 이어붙여 매칭
         non_empty = [l.strip() for l in body_text.splitlines() if l.strip()]
-        first_line = ' '.join(non_empty[:3])
+        header_window = non_empty[:HEADER_WINDOW_LINES]
+        first_line = ' '.join(header_window)
         print(f"  [첫줄] {repr(first_line)}")
         m = FIRST_LINE_REGEX.match(first_line)
         if not m:
@@ -250,8 +257,8 @@ class DCICrawler:
             return None  # 대회 참가 글 아님
 
         ride_time = _normalize_time(m.group('time'))
-        distance  = m.group('dist')
-        elevation = m.group('ele')
+        distance  = m.group('dist').replace(',', '')
+        elevation = m.group('ele').replace(',', '')
 
         # 닉네임
         nickname_el = soup.select_one('.nickname em')
@@ -281,7 +288,8 @@ class DCICrawler:
         sensor = "O" if any(kw in body_lower for kw in SENSOR_KEYWORDS) else ""
 
         # 사연: 헤더·스트라바 URL 제외 후 Gemini 요약
-        header_lines = min(3, len(non_empty))
+        # 정규식이 실제로 소비한 만큼만 헤더로 취급 (값마다 줄이 나뉜 경우 대응)
+        header_lines = self._count_header_lines(header_window, m.end())
         raw_story = self._extract_story(non_empty, header_lines)
         story = _summarize(raw_story)
 
@@ -297,10 +305,29 @@ class DCICrawler:
             "story":      story,
         }
 
+    def _count_header_lines(self, header_window: list[str], matched_len: int) -> int:
+        """
+        FIRST_LINE_REGEX가 header_window를 ' '로 이어붙인 문자열에서 실제로
+        소비한 글자 수(matched_len)를 바탕으로, 원본 몇 번째 줄까지가
+        헤더(대회명/시간/거리/고도)인지 계산.
+        정규식 끝의 선택적 공백(\\s*)이 다음 줄로 잘못 넘어가 계산되지 않도록,
+        join 구분자로 생긴 트레일링 공백은 제외하고 비교한다.
+        """
+        content_len = len(' '.join(header_window)[:matched_len].rstrip())
+        pos = 0
+        for i, line in enumerate(header_window):
+            line_end = pos + len(line)
+            if content_len <= line_end:
+                return i + 1
+            pos = line_end + 1  # ' '.join 사이 공백 1글자
+        return len(header_window)
+
     def _extract_story(self, non_empty: list[str], header_lines: int) -> str:
+        # URL 자체뿐 아니라, 링크를 붙였을 때 에디터가 자동 생성하는
+        # 미리보기 카드(제목·설명·도메인)도 실제 사연이 아니므로 함께 제외
         story_lines = [
             line for line in non_empty[header_lines:]
-            if not STRAVA_REGEX.search(line)
+            if not STRAVA_REGEX.search(line) and 'strava' not in line.lower()
         ]
         story = ' '.join(story_lines)
         return story[:197] + "..." if len(story) > 200 else story
