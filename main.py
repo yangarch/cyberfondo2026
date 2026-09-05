@@ -6,6 +6,7 @@ Supervisor에 의해 관리되며, 갤러리를 주기적으로 스캔하여 신
 import argparse
 import json
 import os
+import re
 import sys
 import time
 
@@ -79,17 +80,56 @@ def run_once(crawler: DCICrawler, sheets: SheetsManager, seen: set[str], max_pag
     return new_count
 
 
+def run_retry(crawler: DCICrawler, sheets: SheetsManager, seen: set[str]) -> int:
+    """
+    이전에 '본문 패턴 불일치'로 스킵되어 seen에는 있지만 시트에는 없는 글을 재검사.
+    파싱 규칙(정규식)을 고친 뒤 지난 스캔에서 놓친 글을 놓치지 않고 다시 실으려는 용도.
+    갤러리 페이지 목록과 무관하게 seen_posts.json 기준으로 동작하므로
+    MAX_PAGES 범위 밖의 오래된 글도 대상이 됨.
+    """
+    existing_urls = sheets.get_existing_urls()
+    candidates = sorted(seen - existing_urls)
+    print(f"[재검사] 대상 {len(candidates)}건 (seen 중 시트에 없는 URL)")
+
+    new_count = 0
+    for url in candidates:
+        no_match = re.search(r'no=(\d+)', url)
+        if not no_match:
+            continue
+        post_no = no_match.group(1)
+
+        print(f"\n  [재검사] no={post_no} {url}")
+        crawler.random_delay()
+        detail = crawler.get_post_detail(post_no)
+
+        if detail is None:
+            continue  # 여전히 패턴 불일치, 정말 대회 참가 글이 아닌 것
+
+        try:
+            sheets.append_post(detail.get("title") or url, url, detail)
+            new_count += 1
+        except Exception as e:
+            print(f"  [오류] 시트 적재 실패: {e}")
+
+    return new_count
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--pages", type=int, default=MAX_PAGES,
                         help="이번 실행에만 적용할 최대 페이지 수 (기본: MAX_PAGES)")
     parser.add_argument("--once", action="store_true",
                         help="한 사이클만 실행 후 종료 (딥스캔용)")
+    parser.add_argument("--retry-skipped", action="store_true",
+                        help="이전에 패턴 불일치로 스킵된 글만 재검사 후 종료 "
+                             "(파싱 규칙을 고친 뒤 지난 글을 다시 실을 때 사용)")
     args = parser.parse_args()
 
     print("=" * 50)
     print("  CyberFondo 데이터 파이프라인 시작")
-    if args.once:
+    if args.retry_skipped:
+        print("  [재검사 모드] 스킵됐던 글만 재검사 후 종료")
+    elif args.once:
         print(f"  [딥스캔 모드] 최대 {args.pages}페이지, 1회 후 종료")
     print("=" * 50)
 
@@ -106,6 +146,12 @@ def main():
         worksheet_name=WORKSHEET_NAME,
     )
     seen = load_seen()
+
+    if args.retry_skipped:
+        count = run_retry(crawler, sheets, seen)
+        save_seen(seen)
+        print(f"\n[재검사 완료] 신규 적재: {count}건")
+        return
 
     while True:
         print(f"\n{'─' * 40}")

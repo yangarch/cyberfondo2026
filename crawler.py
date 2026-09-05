@@ -261,6 +261,11 @@ class DCICrawler:
         distance  = m.group('dist').replace(',', '')
         elevation = m.group('ele').replace(',', '')
 
+        # 제목 (재검사 등 목록 페이지 없이 상세만으로 처리할 때 사용)
+        title_el = soup.select_one('.title_subject')
+        title    = title_el.get_text(strip=True) if title_el else ""
+        title    = re.sub(r'\s*\[\d+\]$', '', title).strip()
+
         # 닉네임
         nickname_el = soup.select_one('.nickname em')
         nickname    = nickname_el.get_text(strip=True) if nickname_el else ""
@@ -295,6 +300,7 @@ class DCICrawler:
         story = _summarize(raw_story)
 
         return {
+            "title":      title,
             "nickname":   nickname,
             "uid":        uid,
             "post_date":  post_date,

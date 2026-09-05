@@ -66,6 +66,16 @@ python auth_setup.py      # 구글 API 인증 (최초 1회)
 python main.py
 ```
 
+### 재검사 (파싱 규칙 변경 후 지난 글 다시 싣기)
+
+패턴 불일치로 스킵된 글은 시트엔 안 실리지만 `seen_posts.json`에는 "확인함"으로 기록돼서, 정규식을 고쳐도 다음 스캔에서 자동으로 다시 검사되지 않습니다. 이럴 때는:
+
+```bash
+python main.py --retry-skipped
+```
+
+`seen`에는 있지만 시트(K열)에는 없는 URL만 골라 재검사 후 종료합니다. 상시 실행 중인 Supervisor 프로세스와는 별개로, 필요할 때 수동으로 한 번 실행하면 됩니다.
+
 `credentials.json`, `token.json`, `.env`는 저장소에 포함되지 않습니다.
 
 ## 기술 스택
