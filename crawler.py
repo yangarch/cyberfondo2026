@@ -66,7 +66,7 @@ def _init_gemini(api_key: str):
     global _gemini_model
     if api_key and _gemini_model is None:
         genai.configure(api_key=api_key)
-        _gemini_model = genai.GenerativeModel("gemini-2.0-flash-lite")
+        _gemini_model = genai.GenerativeModel("gemini-3.5-flash-lite")
 
 def _summarize(text: str) -> str:
     """Gemini로 사연 요약. API 키 없거나 내용 없으면 원문 200자 반환."""
