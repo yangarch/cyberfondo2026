@@ -76,6 +76,16 @@ python main.py --retry-skipped
 
 `seen`에는 있지만 시트(K열)에는 없는 URL만 골라 재검사 후 종료합니다. 상시 실행 중인 Supervisor 프로세스와는 별개로, 필요할 때 수동으로 한 번 실행하면 됩니다.
 
+### 특정 글 하나만 처리
+
+```bash
+python main.py --post 1124284
+# 또는 URL 그대로
+python main.py --post "https://gall.dcinside.com/mgallery/board/view/?id=cycle&no=1124284"
+```
+
+게시글 번호나 URL 하나를 지정해서 그 글만 조회·파싱 후 종료합니다. 특정 글이 왜 스킵됐는지 확인하거나, 정규식을 고친 뒤 그 글 하나만 바로 확인하고 싶을 때 씁니다. 시트에 성공적으로 적재된 경우에만 `seen_posts.json`에 기록되고, 실패/스킵은 기록하지 않아 다음 정기 스캔이나 `--retry-skipped`에서 다시 시도될 수 있습니다.
+
 `credentials.json`, `token.json`, `.env`는 저장소에 포함되지 않습니다.
 
 ## 기술 스택

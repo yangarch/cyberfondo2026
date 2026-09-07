@@ -162,6 +162,10 @@ class DCICrawler:
             return "https://gall.dcinside.com/mgallery/board"
         return "https://gall.dcinside.com/board"
 
+    def build_post_url(self, post_no: str) -> str:
+        """게시글 번호로 상세 페이지 URL 구성 (단건 처리용)."""
+        return f"{self._base()}/view/?id={self.gallery_id}&no={post_no}"
+
     def random_delay(self):
         delay = random.uniform(self.min_delay, self.max_delay)
         print(f"  [딜레이] {delay:.1f}s")

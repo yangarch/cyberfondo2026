@@ -114,6 +114,34 @@ def run_retry(crawler: DCICrawler, sheets: SheetsManager, seen: set[str]) -> int
     return new_count
 
 
+def run_single(crawler: DCICrawler, sheets: SheetsManager, seen: set[str], target: str) -> bool:
+    """
+    게시글 번호 또는 URL 하나만 지정해서 처리 (디버깅/특정 글 강제 확인용).
+    성공(시트 적재)하면 seen에도 기록해서 다음 스캔에서 중복 확인 안 하게 하고,
+    스킵/실패는 seen을 건드리지 않아 다음 정기 스캔이나 --retry-skipped에서
+    다시 시도될 수 있게 둔다.
+    """
+    no_match = re.search(r'no=(\d+)', target)
+    post_no  = no_match.group(1) if no_match else target.strip()
+    post_url = target if target.startswith("http") else crawler.build_post_url(post_no)
+
+    print(f"[단건 처리] no={post_no} {post_url}")
+    detail = crawler.get_post_detail(post_no)
+
+    if detail is None:
+        print("  [스킵] 패턴 불일치 또는 조회 실패")
+        return False
+
+    try:
+        sheets.append_post(detail.get("title") or post_url, post_url, detail)
+        seen.add(post_url)
+        print("  [완료] 시트 적재됨")
+        return True
+    except Exception as e:
+        print(f"  [오류] 시트 적재 실패: {e}")
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--pages", type=int, default=MAX_PAGES,
@@ -123,11 +151,15 @@ def main():
     parser.add_argument("--retry-skipped", action="store_true",
                         help="이전에 패턴 불일치로 스킵된 글만 재검사 후 종료 "
                              "(파싱 규칙을 고친 뒤 지난 글을 다시 실을 때 사용)")
+    parser.add_argument("--post", type=str, default=None,
+                        help="게시글 번호 또는 URL 하나만 지정해서 처리 후 종료")
     args = parser.parse_args()
 
     print("=" * 50)
     print("  CyberFondo 데이터 파이프라인 시작")
-    if args.retry_skipped:
+    if args.post:
+        print(f"  [단건 처리 모드] {args.post} 처리 후 종료")
+    elif args.retry_skipped:
         print("  [재검사 모드] 스킵됐던 글만 재검사 후 종료")
     elif args.once:
         print(f"  [딥스캔 모드] 최대 {args.pages}페이지, 1회 후 종료")
@@ -146,6 +178,12 @@ def main():
         worksheet_name=WORKSHEET_NAME,
     )
     seen = load_seen()
+
+    if args.post:
+        success = run_single(crawler, sheets, seen, args.post)
+        save_seen(seen)
+        print(f"\n[단건 처리 완료] {'성공' if success else '실패/스킵'}")
+        return
 
     if args.retry_skipped:
         count = run_retry(crawler, sheets, seen)
