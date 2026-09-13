@@ -87,14 +87,8 @@ class SheetsManager:
             self.ws.add_rows(500)
             print(f"  [시트] 행 500개 자동 추가 (현재 {self.ws.row_count}행)")
 
-        # 8시간 이하: 총 시간(분) × (거리 1km당 5점 + 획고 1m당 0.2점)
-        # 8시간 초과: (480²/분) × base = 일정 페이스 가정 시 8시간 기준 역산값
-        score_formula = (
-            f'=IF(J{next_row}="완료",'
-            f'IF(F{next_row}*1440<=480,'
-            f'F{next_row}*1440*(G{next_row}*5+H{next_row}*0.2),'
-            f'(480^2/(F{next_row}*1440))*(G{next_row}*5+H{next_row}*0.2)),0)'
-        )
+        # 시간 무관, 거리 1km당 5점 + 획고 1m당 0.2점 (검증 완료 시에만)
+        score_formula = f'=IF(J{next_row}="완료",(G{next_row}*5+H{next_row}*0.2),0)'
 
         safe_title    = title.replace('"', "'")
         title_formula = f'=HYPERLINK("{post_url}","{safe_title}")'
@@ -125,7 +119,7 @@ class SheetsManager:
         print(f"  [시트] 행 {next_row} 적재 완료: {title[:40]}")
 
     def update_score_formulas(self, start_row: int = 4):
-        """기존 행의 점수 수식을 새 기준(총시간×점수)으로 일괄 업데이트."""
+        """기존 행의 점수 수식을 새 기준(시간 무관, 거리·획고 기반)으로 일괄 업데이트."""
         k_values = self.ws.col_values(11)  # K열 기준 마지막 행 탐색
         end_row = len(k_values)
 
@@ -137,7 +131,7 @@ class SheetsManager:
             {
                 "range": f"I{row}",
                 "values": [[
-                    f'=IF(J{row}="완료",IF(F{row}*1440<=480,F{row}*1440*(G{row}*5+H{row}*0.2),(480^2/(F{row}*1440))*(G{row}*5+H{row}*0.2)),0)'
+                    f'=IF(J{row}="완료",(G{row}*5+H{row}*0.2),0)'
                 ]],
             }
             for row in range(start_row, end_row + 1)
