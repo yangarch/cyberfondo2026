@@ -4,11 +4,14 @@ B~N열 순서로 데이터를 Append하며, I열에 점수 수식을 자동 삽�
 """
 
 import json
+import os
 import gspread
 from google.oauth2.credentials import Credentials
+from google.oauth2.service_account import Credentials as ServiceAccountCredentials
 from google.auth.transport.requests import Request
 
-TOKEN_FILE = "token.json"   # auth_setup.py 실행으로 생성
+TOKEN_FILE           = "token.json"                                          # auth_setup.py 실행으로 생성 (OAuth, 레거시)
+SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT_FILE", "service_account.json")  # 서비스 계정 키 (권장)
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -16,8 +19,20 @@ SCOPES = [
 ]
 
 
-def _load_credentials() -> Credentials:
-    """token.json을 로드하고 만료 시 자동 갱신."""
+def _load_credentials():
+    """
+    서비스 계정 키 파일이 있으면 그걸로 인증 (만료·재인증 개념 자체가 없음).
+    없으면 기존 OAuth token.json 방식으로 폴백 (7일 만료 등 유지보수 부담 있음).
+    """
+    if os.path.exists(SERVICE_ACCOUNT_FILE):
+        return ServiceAccountCredentials.from_service_account_file(
+            SERVICE_ACCOUNT_FILE, scopes=SCOPES,
+        )
+    return _load_oauth_credentials()
+
+
+def _load_oauth_credentials() -> Credentials:
+    """token.json을 로드하고 만료 시 자동 갱신. (레거시 경로)"""
     with open(TOKEN_FILE) as f:
         data = json.load(f)
 

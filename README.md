@@ -62,8 +62,21 @@ API 키가 없거나 호출이 실패하면 원문 앞부분을 잘라 넣고 �
 ```bash
 pip install -r requirements.txt
 cp .env.example .env      # 시트 ID, Gemini API 키 등 입력
-python auth_setup.py      # 구글 API 인증 (최초 1회)
 python main.py
+```
+
+### 구글 인증
+
+두 가지 방식을 지원하며, `service_account.json`이 있으면 그걸 우선 쓰고 없으면 OAuth(`token.json`)로 폴백합니다.
+
+**서비스 계정 (권장)** — 만료·재인증 개념이 없어 상시 운영에 적합:
+1. Google Cloud Console에서 서비스 계정 생성 후 JSON 키 발급
+2. 프로젝트 루트에 `service_account.json`으로 저장
+3. 대상 스프레드시트를 그 서비스 계정 이메일(`client_email`)로 편집자 공유
+
+**OAuth (레거시)** — 개인 계정으로 직접 인증하는 방식. 동의 화면이 "테스트" 상태면 토큰이 7일마다 만료되어 재인증이 필요함:
+```bash
+python auth_setup.py      # 최초 1회, 브라우저 인증 필요
 ```
 
 ### 재검사 (파싱 규칙 변경 후 지난 글 다시 싣기)
