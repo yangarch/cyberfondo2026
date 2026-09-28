@@ -104,3 +104,14 @@ python main.py --post "https://gall.dcinside.com/mgallery/board/view/?id=cycle&n
 ## 기술 스택
 
 Python · BeautifulSoup4 · Requests · gspread(Google Sheets API) · google-generativeai(Gemini) · Supervisor
+
+## 상장 페이지 (대회 종료 후)
+
+닉네임을 입력하면 종합·거리·획득고도 순위가 담긴 상장 이미지를 만들어 주는 정적 페이지입니다. 기록은 시트의 '최종순위표' 탭에서 헤더 이름(닉네임·거리·획고 등)으로 열을 찾아 읽습니다. 종합순위 열이 있으면 그대로 쓰고, 거리·획득고도 순위는 스크립트가 계산합니다.
+
+```bash
+python export_results.py --date 2026-09-28     # 시트 → web/results.json
+sudo mkdir -p /var/www/cyberfondo && sudo cp web/* /var/www/cyberfondo/
+sudo cp deploy/nginx/cyberfondo.conf /etc/nginx/conf.d/
+sudo nginx -t && sudo systemctl reload nginx
+```

@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>사이버폰도 상장</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Song+Myung&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4efe3;
+    --fg: #2b2418;
+    --muted: #7a6d57;
+    --accent: #9b1c1c;
+    --card: #fffdf7;
+    --line: #d9cfb8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "Nanum Myeongjo", serif;
+    min-height: 100vh;
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 48px 16px 64px; }
+  h1 {
+    font-family: "Song Myung", serif;
+    font-weight: 400;
+    font-size: 40px;
+    text-align: center;
+    margin: 0 0 4px;
+    letter-spacing: 0.1em;
+  }
+  .sub { text-align: center; color: var(--muted); margin: 0 0 32px; }
+  form { display: flex; gap: 8px; }
+  input {
+    flex: 1; min-width: 0;
+    font: inherit; font-size: 18px;
+    padding: 12px 14px;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--card); color: var(--fg);
+  }
+  button {
+    font: inherit; font-size: 16px; font-weight: 700;
+    padding: 12px 18px;
+    border: 0; border-radius: 8px;
+    background: var(--accent); color: #fff;
+    cursor: pointer;
+  }
+  button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  #msg { margin: 16px 0 0; color: var(--muted); text-align: center; min-height: 1.5em; }
+  #choices { list-style: none; padding: 0; margin: 8px 0 0; }
+  #choices button {
+    width: 100%; text-align: left; margin-top: 6px;
+    background: var(--card); color: var(--fg); border: 1px solid var(--line); font-weight: 400;
+  }
+  #choices small { color: var(--muted); margin-left: 6px; }
+  #result { margin-top: 32px; display: none; }
+  #result canvas {
+    width: 100%; height: auto; display: block;
+    box-shadow: 0 6px 24px rgba(60, 40, 10, 0.25);
+  }
+  .actions { display: flex; gap: 8px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>사이버폰도 상장</h1>
+  <p class="sub">로드사이클갤러리 · 닉네임을 입력하면 상장을 발급해 드립니다</p>
+
+  <form id="search">
+    <input id="nick" placeholder="닉네임" autocomplete="off" required>
+    <button type="submit">상장 받기</button>
+  </form>
+  <p id="msg"></p>
+  <ul id="choices"></ul>
+
+  <section id="result">
+    <canvas id="cert" width="1414" height="2000"></canvas>
+    <div class="actions">
+      <button id="download">이미지 저장</button>
+      <button id="again" class="ghost">다른 닉네임</button>
+    </div>
+  </section>
+</main>
+
+<script>
+const W = 1414, H = 2000;
+const INK = "#1f1a12", GOLD = "#a8843a", NAVY = "#23345c", SEAL = "#c0262d";
+const SERIF = '"Nanum Myeongjo", serif';
+const BRUSH = '"Song Myung", "Nanum Myeongjo", serif';
+
+let data = null;
+let current = null;
+
+const $ = (id) => document.getElementById(id);
+const fmt = (n, d = 0) => Number(n).toLocaleString("ko-KR", { minimumFractionDigits: d, maximumFractionDigits: d });
+
+async function loadData() {
+  if (data) return data;
+  const res = await fetch("results.json", { cache: "no-cache" });
+  if (!res.ok) throw new Error("결과 파일을 불러오지 못했습니다.");
+  data = await res.json();
+  return data;
+}
+
+function awardName(rank, total) {
+  if (rank === 1) return "대   상";
+  if (rank <= 3) return "최 우 수 상";
+  if (rank <= Math.max(10, Math.ceil(total * 0.1))) return "우 수 상";
+  return "완 주 상";
+}
+
+// ---- 테두리 ---------------------------------------------------------------
+
+function drawBorder(ctx) {
+  ctx.fillStyle = "#fbf6e9";
+  ctx.fillRect(0, 0, W, H);
+
+  // 종이 결
+  const g = ctx.createRadialGradient(W / 2, H / 2, 200, W / 2, H / 2, H * 0.75);
+  g.addColorStop(0, "rgba(255,255,255,0)");
+  g.addColorStop(1, "rgba(170,140,80,0.18)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  const m = 60, band = 64;
+  // 바깥 굵은 테
+  ctx.strokeStyle = NAVY;
+  ctx.lineWidth = 10;
+  ctx.strokeRect(m, m, W - m * 2, H - m * 2);
+  ctx.lineWidth = 3;
+  ctx.strokeRect(m + band, m + band, W - (m + band) * 2, H - (m + band) * 2);
+
+  // 回 문양 띠
+  const unit = 40;
+  const inner = m + 12, span = band - 24;
+  const tile = (x, y) => {
+    ctx.strokeStyle = GOLD;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x + 4, y + 4, span - 8, span - 8);
+    ctx.fillStyle = GOLD;
+    ctx.fillRect(x + span / 2 - 6, y + span / 2 - 6, 12, 12);
+  };
+  const countX = Math.floor((W - inner * 2) / span);
+  const offX = inner + ((W - inner * 2) - countX * span) / 2;
+  for (let i = 0; i < countX; i++) {
+    tile(offX + i * span, inner);
+    tile(offX + i * span, H - inner - span);
+  }
+  const countY = Math.floor((H - inner * 2 - span * 2) / span);
+  const offY = inner + span + ((H - inner * 2 - span * 2) - countY * span) / 2;
+  for (let i = 0; i < countY; i++) {
+    tile(inner, offY + i * span);
+    tile(W - inner - span, offY + i * span);
+  }
+
+  // 안쪽 얇은 이중선
+  const im = m + band + 18;
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(im, im, W - im * 2, H - im * 2);
+  ctx.lineWidth = 1;
+  ctx.strokeRect(im + 8, im + 8, W - (im + 8) * 2, H - (im + 8) * 2);
+
+  // 모서리 장식
+  const corner = (cx, cy, sx, sy) => {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(sx, sy);
+    ctx.strokeStyle = GOLD;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, 70); ctx.lineTo(0, 0); ctx.lineTo(70, 0);
+    ctx.moveTo(18, 70); ctx.lineTo(18, 18); ctx.lineTo(70, 18);
+    ctx.stroke();
+    ctx.fillStyle = GOLD;
+    ctx.beginPath();
+    ctx.arc(36, 36, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  };
+  const c = im + 22;
+  corner(c, c, 1, 1);
+  corner(W - c, c, -1, 1);
+  corner(c, H - c, 1, -1);
+  corner(W - c, H - c, -1, -1);
+
+  // 워터마크
+  ctx.save();
+  ctx.translate(W / 2, H / 2 + 60);
+  ctx.rotate(-Math.PI / 9);
+  ctx.fillStyle = "rgba(35,52,92,0.035)";
+  ctx.font = `800 260px ${SERIF}`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("SCOPE", 0, 0);
+  ctx.restore();
+}
+
+// ---- 직인 -----------------------------------------------------------------
+
+function drawSeal(ctx, cx, cy, size) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.04);
+  ctx.globalAlpha = 0.88;
+  ctx.strokeStyle = SEAL;
+  ctx.fillStyle = SEAL;
+  const h = size / 2;
+  ctx.lineWidth = 9;
+  roundRect(ctx, -h, -h, size, size, 14);
+  ctx.stroke();
+  ctx.lineWidth = 2.5;
+  roundRect(ctx, -h + 13, -h + 13, size - 26, size - 26, 8);
+  ctx.stroke();
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `800 ${size * 0.2}px ${SERIF}`;
+  ctx.fillText("SCOPE", 0, -size * 0.14);
+  ctx.font = `${size * 0.3}px ${BRUSH}`;
+  ctx.fillText("之 印", 0, size * 0.19);
+
+  // 인주 번짐 느낌: 군데군데 지우기
+  ctx.globalCompositeOperation = "destination-out";
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 90; i++) {
+    ctx.globalAlpha = 0.25 + rnd() * 0.5;
+    ctx.beginPath();
+    ctx.arc((rnd() - 0.5) * size, (rnd() - 0.5) * size, 1 + rnd() * 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// ---- 본문 -----------------------------------------------------------------
+
+function fitFont(ctx, text, weight, family, size, maxWidth) {
+  do {
+    ctx.font = `${weight} ${size}px ${family}`;
+    if (ctx.measureText(text).width <= maxWidth) break;
+    size -= 2;
+  } while (size > 20);
+  return size;
+}
+
+function drawCertificate(entry, meta) {
+  const ctx = $("cert").getContext("2d");
+  ctx.clearRect(0, 0, W, H);
+  drawBorder(ctx);
+
+  const left = 250, right = W - 250;
+  ctx.fillStyle = INK;
+  ctx.textBaseline = "alphabetic";
+
+  // 호수
+  ctx.textAlign = "left";
+  ctx.font = `400 34px ${SERIF}`;
+  ctx.fillText(`제 2026-${String(entry.rank_total).padStart(3, "0")} 호`, left, 330);
+
+  // 제목
+  ctx.textAlign = "center";
+  ctx.font = `180px ${BRUSH}`;
+  ctx.fillText("상  장", W / 2, 540);
+
+  ctx.fillStyle = NAVY;
+  ctx.font = `700 50px ${SERIF}`;
+  ctx.fillText(awardName(entry.rank_total, meta.total), W / 2, 650);
+
+  // 성명
+  ctx.fillStyle = INK;
+  ctx.textAlign = "right";
+  const label = "닉네임 : ";
+  ctx.font = `400 40px ${SERIF}`;
+  const labelW = ctx.measureText(label).width;
+  const nickSize = fitFont(ctx, entry.nickname, 800, SERIF, 60, right - left - labelW - 40);
+  ctx.font = `800 ${nickSize}px ${SERIF}`;
+  const nickW = ctx.measureText(entry.nickname).width;
+  ctx.fillText(entry.nickname, right, 790);
+  ctx.font = `400 40px ${SERIF}`;
+  ctx.fillText(label, right - nickW, 790);
+
+  // 성적표
+  const rows = [
+    ["종 합 순 위", entry.rank_total, "점수", `${fmt(entry.score, 1)} 점`],
+    ["거 리 순 위", entry.rank_distance, "주행거리", `${entry.distance.toLocaleString("ko-KR", { maximumFractionDigits: 2 })} km`],
+    ["획득고도순위", entry.rank_elevation, "획득고도", `${fmt(entry.elevation)} m`],
+  ];
+  const top = 880, rowH = 110;
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(left, top); ctx.lineTo(right, top);
+  ctx.moveTo(left, top + rowH * rows.length); ctx.lineTo(right, top + rowH * rows.length);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+  rows.forEach(([name, rank, dataLabel, value], i) => {
+    const y = top + rowH * i + rowH / 2 + 14;
+    if (i > 0) {
+      ctx.beginPath();
+      ctx.moveTo(left, top + rowH * i);
+      ctx.lineTo(right, top + rowH * i);
+      ctx.stroke();
+    }
+    ctx.textAlign = "left";
+    ctx.fillStyle = INK;
+    ctx.font = `700 40px ${SERIF}`;
+    ctx.fillText(name, left + 20, y);
+
+    ctx.fillStyle = SEAL;
+    ctx.font = `800 52px ${SERIF}`;
+    ctx.fillText(`${rank}위`, left + 330, y);
+    const rankW = ctx.measureText(`${rank}위`).width;
+    ctx.fillStyle = "#6b5e46";
+    ctx.font = `400 30px ${SERIF}`;
+    ctx.fillText(` / ${meta.total}명`, left + 330 + rankW, y);
+
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#6b5e46";
+    ctx.font = `400 30px ${SERIF}`;
+    ctx.fillText(dataLabel, right - 250, y);
+    ctx.fillStyle = INK;
+    ctx.font = `700 40px ${SERIF}`;
+    ctx.fillText(value, right - 20, y);
+  });
+
+  // 본문
+  ctx.fillStyle = INK;
+  ctx.textAlign = "center";
+  ctx.font = `400 48px ${SERIF}`;
+  const body = ["위 사람은 2026 사이버폰도에 참가하여", "위와 같은 성적을 기록하였기에", "이 상장을 수여합니다."];
+  body.forEach((line, i) => {
+    ctx.fillText(line, W / 2, 1360 + i * 84);
+  });
+
+  // 날짜
+  const [y, mo, d] = meta.date.split("-").map(Number);
+  ctx.font = `400 40px ${SERIF}`;
+  ctx.fillText(`${y}년  ${mo}월  ${d}일`, W / 2, 1620);
+
+  // 수여 기관 + 직인
+  ctx.font = `800 58px ${SERIF}`;
+  const org = "로드사이클갤러리  SCOPE";
+  ctx.fillText(org, W / 2 - 40, 1760);
+  const orgW = ctx.measureText(org).width;
+  drawSeal(ctx, W / 2 - 40 + orgW / 2 + 95, 1740, 170);
+}
+
+async function ensureFonts(entry) {
+  const text = "상장대최우수완주제호닉네임종합거리획득고도순위점수주행위사람은사이버폰도에참가하여와같은성적을기록하였기이를수여합니다년월일로드클갤러리之印명 /0123456789.,:-kmSCOPE" + entry.nickname;
+  await Promise.all([
+    document.fonts.load(`180px "Song Myung"`, text),
+    document.fonts.load(`400 40px "Nanum Myeongjo"`, text),
+    document.fonts.load(`700 40px "Nanum Myeongjo"`, text),
+    document.fonts.load(`800 40px "Nanum Myeongjo"`, text),
+  ]);
+}
+
+async function show(entry) {
+  current = entry;
+  $("choices").innerHTML = "";
+  $("msg").textContent = "상장을 그리는 중...";
+  try { await ensureFonts(entry); } catch (_) { /* 폰트 실패 시 기본 글꼴로 */ }
+  drawCertificate(entry, data);
+  $("msg").textContent = "";
+  $("result").style.display = "block";
+  $("result").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function maskUid(uid) {
+  if (!uid) return "";
+  return /^\d+\.\d+$/.test(uid) ? `(${uid})` : `(${uid.slice(0, 3)}***)`;
+}
+
+$("search").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("result").style.display = "none";
+  $("choices").innerHTML = "";
+  const q = $("nick").value.trim();
+  if (!q) return;
+  try {
+    await loadData();
+  } catch (err) {
+    $("msg").textContent = err.message;
+    return;
+  }
+  const norm = (s) => s.toLowerCase().replace(/\s+/g, "");
+  const exact = data.results.filter((r) => norm(r.nickname) === norm(q));
+  const matches = exact.length ? exact : data.results.filter((r) => norm(r.nickname).includes(norm(q)));
+
+  if (matches.length === 1) return show(matches[0]);
+  if (!matches.length) {
+    $("msg").textContent = "검증 완료된 기록을 찾지 못했습니다. 닉네임을 확인해 주세요.";
+    return;
+  }
+  $("msg").textContent = `${matches.length}명이 검색되었습니다. 본인을 선택해 주세요.`;
+  for (const r of matches.slice(0, 30)) {
+    const li = document.createElement("li");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = r.nickname;
+    const small = document.createElement("small");
+    small.textContent = `${maskUid(r.uid)} · ${fmt(r.distance, 1)}km · ${fmt(r.elevation)}m`;
+    btn.appendChild(small);
+    btn.addEventListener("click", () => show(r));
+    li.appendChild(btn);
+    $("choices").appendChild(li);
+  }
+});
+
+$("download").addEventListener("click", () => {
+  const a = document.createElement("a");
+  a.download = `사이버폰도_상장_${current.nickname}.png`;
+  a.href = $("cert").toDataURL("image/png");
+  a.click();
+});
+
+$("again").addEventListener("click", () => {
+  $("result").style.display = "none";
+  $("nick").value = "";
+  $("nick").focus();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+</script>
+</body>
+</html>

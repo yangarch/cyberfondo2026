@@ -28,3 +28,6 @@ build/
 # IDE
 .idea/
 .vscode/
+
+# 상장 페이지용 결과 데이터 (export_results.py로 생성)
+web/results.json
