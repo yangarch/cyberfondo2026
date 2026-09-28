@@ -78,7 +78,7 @@
   <ul id="choices"></ul>
 
   <section id="result">
-    <canvas id="cert" width="1414" height="2000"></canvas>
+    <canvas id="cert" width="2480" height="3508"></canvas>
     <div class="actions">
       <button id="download">이미지 저장</button>
       <button id="again" class="ghost">다른 닉네임</button>
@@ -87,8 +87,11 @@
 </main>
 
 <script>
+// 레이아웃은 1414x2000 좌표계로 그리고, 캔버스는 템플릿 원본(A4 300dpi) 해상도로 확대
 const W = 1414, H = 2000;
-const INK = "#1f1a12", GOLD = "#a8843a", NAVY = "#23345c", SEAL = "#c0262d";
+const INK = "#1c1a16", GOLD = "#a67f0a", SUBTLE = "#6f6552", SEAL = "#c0262d";
+const template = new Image();
+template.src = "img/template.png";
 const SERIF = '"Nanum Myeongjo", serif';
 const BRUSH = '"Song Myung", "Nanum Myeongjo", serif';
 
@@ -111,93 +114,6 @@ function awardName(rank, total) {
   if (rank <= 3) return "최 우 수 상";
   if (rank <= Math.max(10, Math.ceil(total * 0.1))) return "우 수 상";
   return "완 주 상";
-}
-
-// ---- 테두리 ---------------------------------------------------------------
-
-function drawBorder(ctx) {
-  ctx.fillStyle = "#fbf6e9";
-  ctx.fillRect(0, 0, W, H);
-
-  // 종이 결
-  const g = ctx.createRadialGradient(W / 2, H / 2, 200, W / 2, H / 2, H * 0.75);
-  g.addColorStop(0, "rgba(255,255,255,0)");
-  g.addColorStop(1, "rgba(170,140,80,0.18)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, H);
-
-  const m = 60, band = 64;
-  // 바깥 굵은 테
-  ctx.strokeStyle = NAVY;
-  ctx.lineWidth = 10;
-  ctx.strokeRect(m, m, W - m * 2, H - m * 2);
-  ctx.lineWidth = 3;
-  ctx.strokeRect(m + band, m + band, W - (m + band) * 2, H - (m + band) * 2);
-
-  // 回 문양 띠
-  const unit = 40;
-  const inner = m + 12, span = band - 24;
-  const tile = (x, y) => {
-    ctx.strokeStyle = GOLD;
-    ctx.lineWidth = 3;
-    ctx.strokeRect(x + 4, y + 4, span - 8, span - 8);
-    ctx.fillStyle = GOLD;
-    ctx.fillRect(x + span / 2 - 6, y + span / 2 - 6, 12, 12);
-  };
-  const countX = Math.floor((W - inner * 2) / span);
-  const offX = inner + ((W - inner * 2) - countX * span) / 2;
-  for (let i = 0; i < countX; i++) {
-    tile(offX + i * span, inner);
-    tile(offX + i * span, H - inner - span);
-  }
-  const countY = Math.floor((H - inner * 2 - span * 2) / span);
-  const offY = inner + span + ((H - inner * 2 - span * 2) - countY * span) / 2;
-  for (let i = 0; i < countY; i++) {
-    tile(inner, offY + i * span);
-    tile(W - inner - span, offY + i * span);
-  }
-
-  // 안쪽 얇은 이중선
-  const im = m + band + 18;
-  ctx.strokeStyle = GOLD;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(im, im, W - im * 2, H - im * 2);
-  ctx.lineWidth = 1;
-  ctx.strokeRect(im + 8, im + 8, W - (im + 8) * 2, H - (im + 8) * 2);
-
-  // 모서리 장식
-  const corner = (cx, cy, sx, sy) => {
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.scale(sx, sy);
-    ctx.strokeStyle = GOLD;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(0, 70); ctx.lineTo(0, 0); ctx.lineTo(70, 0);
-    ctx.moveTo(18, 70); ctx.lineTo(18, 18); ctx.lineTo(70, 18);
-    ctx.stroke();
-    ctx.fillStyle = GOLD;
-    ctx.beginPath();
-    ctx.arc(36, 36, 8, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  };
-  const c = im + 22;
-  corner(c, c, 1, 1);
-  corner(W - c, c, -1, 1);
-  corner(c, H - c, 1, -1);
-  corner(W - c, H - c, -1, -1);
-
-  // 워터마크
-  ctx.save();
-  ctx.translate(W / 2, H / 2 + 60);
-  ctx.rotate(-Math.PI / 9);
-  ctx.fillStyle = "rgba(35,52,92,0.035)";
-  ctx.font = `800 260px ${SERIF}`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("SCOPE", 0, 0);
-  ctx.restore();
 }
 
 // ---- 직인 -----------------------------------------------------------------
@@ -259,113 +175,119 @@ function fitFont(ctx, text, weight, family, size, maxWidth) {
 }
 
 function drawCertificate(entry, meta) {
-  const ctx = $("cert").getContext("2d");
-  ctx.clearRect(0, 0, W, H);
-  drawBorder(ctx);
+  const canvas = $("cert");
+  canvas.width = template.naturalWidth || W * 2;
+  canvas.height = template.naturalHeight || H * 2;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (template.naturalWidth) ctx.drawImage(template, 0, 0);
+  ctx.scale(canvas.width / W, canvas.height / H);
 
-  const left = 250, right = W - 250;
+  const left = 220, right = W - 220;
   ctx.fillStyle = INK;
   ctx.textBaseline = "alphabetic";
 
   // 호수
   ctx.textAlign = "left";
-  ctx.font = `400 34px ${SERIF}`;
+  ctx.font = `400 32px ${SERIF}`;
   ctx.fillText(`제 2026-${String(meta.results.indexOf(entry) + 1).padStart(3, "0")} 호`, left, 330);
 
   // 제목
   ctx.textAlign = "center";
-  ctx.font = `180px ${BRUSH}`;
-  ctx.fillText("상  장", W / 2, 540);
+  ctx.font = `800 170px ${SERIF}`;
+  ctx.fillText("상    장", W / 2, 560);
 
-  ctx.fillStyle = NAVY;
-  ctx.font = `700 50px ${SERIF}`;
-  ctx.fillText(awardName(entry.rank_total, meta.totals.total), W / 2, 650);
+  ctx.fillStyle = GOLD;
+  ctx.font = `700 48px ${SERIF}`;
+  ctx.fillText(awardName(entry.rank_total, meta.totals.total), W / 2, 670);
 
-  // 성명
+  // 닉네임
   ctx.fillStyle = INK;
   ctx.textAlign = "right";
-  const label = "닉네임 : ";
-  ctx.font = `400 40px ${SERIF}`;
+  const label = "닉네임  ";
+  ctx.font = `400 38px ${SERIF}`;
   const labelW = ctx.measureText(label).width;
-  const nickSize = fitFont(ctx, entry.nickname, 800, SERIF, 60, right - left - labelW - 40);
+  const nickSize = fitFont(ctx, entry.nickname, 800, SERIF, 58, right - left - labelW - 40);
   ctx.font = `800 ${nickSize}px ${SERIF}`;
   const nickW = ctx.measureText(entry.nickname).width;
-  ctx.fillText(entry.nickname, right, 790);
-  ctx.font = `400 40px ${SERIF}`;
-  ctx.fillText(label, right - nickW, 790);
+  ctx.fillText(entry.nickname, right, 810);
+  ctx.fillStyle = SUBTLE;
+  ctx.font = `400 38px ${SERIF}`;
+  ctx.fillText(label, right - nickW, 810);
 
-  // 성적표
+  // 성적
   const val = (v, unit, digits = 0) =>
     v == null ? "-" : `${v.toLocaleString("ko-KR", { maximumFractionDigits: digits })} ${unit}`;
   const rows = [
-    ["종 합 순 위", entry.rank_total, meta.totals.total, "점수", val(entry.score, "점", 2)],
-    ["거 리 순 위", entry.rank_distance, meta.totals.distance, "주행거리", val(entry.distance, "km", 2)],
+    ["종합순위", entry.rank_total, meta.totals.total, "점수", val(entry.score, "점", 2)],
+    ["거리순위", entry.rank_distance, meta.totals.distance, "주행거리", val(entry.distance, "km", 2)],
     ["획득고도순위", entry.rank_elevation, meta.totals.elevation, "획득고도", val(entry.elevation, "m")],
   ];
-  const top = 880, rowH = 110;
+  const top = 900, rowH = 104;
   ctx.strokeStyle = GOLD;
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(left, top); ctx.lineTo(right, top);
   ctx.moveTo(left, top + rowH * rows.length); ctx.lineTo(right, top + rowH * rows.length);
   ctx.stroke();
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 0.8;
+  ctx.setLineDash([4, 6]);
+  for (let i = 1; i < rows.length; i++) {
+    ctx.beginPath();
+    ctx.moveTo(left + 20, top + rowH * i);
+    ctx.lineTo(right - 20, top + rowH * i);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
   rows.forEach(([name, rank, total, dataLabel, value], i) => {
     const y = top + rowH * i + rowH / 2 + 14;
-    if (i > 0) {
-      ctx.beginPath();
-      ctx.moveTo(left, top + rowH * i);
-      ctx.lineTo(right, top + rowH * i);
-      ctx.stroke();
-    }
     ctx.textAlign = "left";
     ctx.fillStyle = INK;
-    ctx.font = `700 40px ${SERIF}`;
-    ctx.fillText(name, left + 20, y);
+    ctx.font = `700 38px ${SERIF}`;
+    ctx.fillText(name, left + 24, y);
 
-    ctx.fillStyle = SEAL;
-    ctx.font = `800 52px ${SERIF}`;
     const rankText = rank ? `${rank}위` : "-";
+    ctx.fillStyle = SEAL;
+    ctx.font = `800 50px ${SERIF}`;
     ctx.fillText(rankText, left + 330, y);
     const rankW = ctx.measureText(rankText).width;
-    ctx.fillStyle = "#6b5e46";
-    ctx.font = `400 30px ${SERIF}`;
+    ctx.fillStyle = SUBTLE;
+    ctx.font = `400 28px ${SERIF}`;
     if (rank && total) ctx.fillText(` / ${total}명`, left + 330 + rankW, y);
 
     ctx.textAlign = "right";
-    ctx.fillStyle = "#6b5e46";
-    ctx.font = `400 30px ${SERIF}`;
-    ctx.fillText(dataLabel, right - 250, y);
+    ctx.fillText(dataLabel, right - 240, y);
     ctx.fillStyle = INK;
-    ctx.font = `700 40px ${SERIF}`;
-    ctx.fillText(value, right - 20, y);
+    ctx.font = `700 38px ${SERIF}`;
+    ctx.fillText(value, right - 24, y);
   });
 
   // 본문
   ctx.fillStyle = INK;
   ctx.textAlign = "center";
-  ctx.font = `400 48px ${SERIF}`;
+  ctx.font = `400 50px ${SERIF}`;
   const body = ["위 사람은 2026 사이버폰도에 참가하여", "위와 같은 성적을 기록하였기에", "이 상장을 수여합니다."];
-  body.forEach((line, i) => {
-    ctx.fillText(line, W / 2, 1360 + i * 84);
-  });
+  body.forEach((line, i) => ctx.fillText(line, W / 2, 1370 + i * 88));
 
   // 날짜
   const [y, mo, d] = meta.date.split("-").map(Number);
   ctx.font = `400 40px ${SERIF}`;
-  ctx.fillText(`${y}년  ${mo}월  ${d}일`, W / 2, 1620);
+  ctx.fillText(`${y}년  ${mo}월  ${d}일`, W / 2, 1650);
 
   // 수여 기관 + 직인
-  ctx.font = `800 58px ${SERIF}`;
+  ctx.font = `800 56px ${SERIF}`;
   const org = "로드사이클갤러리  SCOPE";
-  ctx.fillText(org, W / 2 - 40, 1760);
+  ctx.fillText(org, W / 2 - 40, 1790);
   const orgW = ctx.measureText(org).width;
-  drawSeal(ctx, W / 2 - 40 + orgW / 2 + 95, 1740, 170);
+  drawSeal(ctx, W / 2 - 40 + orgW / 2 + 95, 1770, 160);
 }
 
 async function ensureFonts(entry) {
   const text = "상장대최우수완주제호닉네임종합거리획득고도순위점수주행위사람은사이버폰도에참가하여와같은성적을기록하였기이를수여합니다년월일로드클갤러리之印명 /0123456789.,:-kmSCOPE" + entry.nickname;
   await Promise.all([
+    template.decode().catch(() => {}),
     document.fonts.load(`180px "Song Myung"`, text),
     document.fonts.load(`400 40px "Nanum Myeongjo"`, text),
     document.fonts.load(`700 40px "Nanum Myeongjo"`, text),

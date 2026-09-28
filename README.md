@@ -111,7 +111,7 @@ Python · BeautifulSoup4 · Requests · gspread(Google Sheets API) · google-gen
 
 ```bash
 python export_results.py --date 2026-09-28     # 시트 → web/results.json
-sudo mkdir -p /var/www/cyberfondo && sudo cp web/* /var/www/cyberfondo/
+sudo mkdir -p /var/www/cyberfondo && sudo cp -r web/* /var/www/cyberfondo/
 sudo cp deploy/nginx/cyberfondo.conf /etc/nginx/conf.d/
 sudo nginx -t && sudo systemctl reload nginx
 ```
