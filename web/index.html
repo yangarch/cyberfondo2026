@@ -140,20 +140,93 @@ const MEDAL = {
   3: ["#ffd9b8", "#c07a3e", "#6e3f17"],
 };
 
-function drawMedal(ctx, cx, cy, r, rank, ribbon) {
+// UCI 월드챔피언 저지 순서 (위→아래 / 왼→오른)
+const RAINBOW = ["#0067b1", "#e2231a", "#1b1b1b", "#fcd116", "#009b48"];
+
+const JERSEY_GREEN = "#14a04a";
+const POLKA_PINK = "#e8458f";
+
+// 부문 1위 상징 저지: 종합=무지개(월드챔피언), 거리=그린, 획고=폴카닷
+const JERSEYS = [
+  { kind: "rainbow", rankKey: "rank_total", section: "total" },
+  { kind: "green", rankKey: "rank_distance", section: "distance" },
+  { kind: "polka", rankKey: "rank_elevation", section: "elevation" },
+];
+
+function jerseyOf(entry) {
+  return JERSEYS.find((j) => entry[j.rankKey] === 1) || null;
+}
+
+// shape(Path2D, bbox x,y,w,h)를 저지 무늬로 채움. rainbow는 호출하는 쪽에서 줄무늬로 처리
+function fillJersey(ctx, kind, shape, x, y, w, h, dot) {
+  if (kind === "green") {
+    ctx.fillStyle = JERSEY_GREEN;
+    ctx.fill(shape);
+    return;
+  }
+  ctx.save();
+  ctx.fillStyle = "#fff";
+  ctx.fill(shape);
+  ctx.clip(shape);
+  ctx.fillStyle = POLKA_PINK;
+  const step = dot * 3.2;
+  for (let row = 0, yy = y + step / 2; yy < y + h + step; row++, yy += step * 0.75) {
+    for (let xx = x + (row % 2 ? step / 2 : 0); xx < x + w + step; xx += step) {
+      ctx.beginPath();
+      ctx.arc(xx, yy, dot, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+  ctx.strokeStyle = POLKA_PINK;
+  ctx.lineWidth = 1;
+  ctx.stroke(shape);
+}
+
+function drawJerseyBand(ctx, kind, cx, y, width, height) {
+  const x = cx - width / 2;
+  if (kind === "rainbow") {
+    const stripe = height / RAINBOW.length;
+    RAINBOW.forEach((color, i) => {
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y + i * stripe, width, stripe);
+    });
+    return;
+  }
+  const shape = new Path2D();
+  shape.rect(x, y, width, height);
+  fillJersey(ctx, kind, shape, x, y, width, height, height * 0.2);
+}
+
+function drawMedal(ctx, cx, cy, r, rank, ribbon, jersey = null) {
   const [hi, mid, dark] = MEDAL[rank];
   ctx.save();
   if (ribbon) {
     const rw = r * 0.55, rh = r * 1.5;
+    const yb = cy - r * 0.6, yt = yb - rh;
     [[-1, "#b3262d"], [1, "#23345c"]].forEach(([dir, color]) => {
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(cx + dir * r * 0.15, cy - r * 0.6);
-      ctx.lineTo(cx + dir * (r * 0.15 + rw), cy - r * 0.6 - rh);
-      ctx.lineTo(cx + dir * (r * 0.15 + rw * 2), cy - r * 0.6 - rh);
-      ctx.lineTo(cx + dir * (r * 0.15 + rw), cy - r * 0.6);
-      ctx.closePath();
-      ctx.fill();
+      // 리본 한 쪽 평행사변형: 아래 변 a→d, 위 변 b→c
+      const a = cx + dir * r * 0.15, d = a + dir * rw;
+      const b = cx + dir * (r * 0.15 + rw), c = b + dir * rw;
+      if (jersey === "green" || jersey === "polka") {
+        const shape = new Path2D();
+        shape.moveTo(a, yb); shape.lineTo(b, yt); shape.lineTo(c, yt); shape.lineTo(d, yb);
+        shape.closePath();
+        fillJersey(ctx, jersey, shape, Math.min(a, c), yt, Math.abs(c - a), rh, r * 0.07);
+        return;
+      }
+      const colors = jersey === "rainbow" ? (dir < 0 ? [...RAINBOW].reverse() : RAINBOW) : [color];
+      colors.forEach((col, k) => {
+        const t0 = k / colors.length, t1 = (k + 1) / colors.length;
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.moveTo(a + (d - a) * t0, yb);
+        ctx.lineTo(b + (c - b) * t0, yt);
+        ctx.lineTo(b + (c - b) * t1, yt);
+        ctx.lineTo(a + (d - a) * t1, yb);
+        ctx.closePath();
+        ctx.fill();
+      });
     });
   }
   const g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.1, cx, cy, r);
@@ -266,6 +339,8 @@ function drawCertificate(entry, meta) {
   ctx.fillStyle = GOLD;
   ctx.font = `700 48px ${SERIF}`;
   ctx.fillText(awardName(entry, meta.totals.total), W / 2, 670);
+  const jersey = jerseyOf(entry);
+  if (jersey) drawJerseyBand(ctx, jersey.kind, W / 2, 698, 380, 25);
 
   // 닉네임
   ctx.fillStyle = INK;
@@ -303,7 +378,7 @@ function drawCertificate(entry, meta) {
     ctx.stroke();
 
     const medalX = left + 210;
-    if (MEDAL[rank]) drawMedal(ctx, medalX, cy, 100, rank, true);
+    if (MEDAL[rank]) drawMedal(ctx, medalX, cy, 100, rank, true, jersey && jersey.section === solo.key ? jersey.kind : null);
     const tx = medalX + 170;
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
