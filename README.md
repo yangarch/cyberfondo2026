@@ -112,6 +112,7 @@ Python · BeautifulSoup4 · Requests · gspread(Google Sheets API) · google-gen
 ```bash
 python export_results.py --date 2026-09-28     # 시트 → web/results.json
 sudo mkdir -p /var/www/cyberfondo && sudo cp -r web/* /var/www/cyberfondo/
-sudo cp deploy/nginx/cyberfondo.conf /etc/nginx/conf.d/
-sudo nginx -t && sudo systemctl reload nginx
+sudo bash deploy/setup_https.sh                # 최초 1회: 인증서 발급 + nginx 설정
 ```
+
+https://cyberfondo.yangarch.net:4080 으로 서비스됩니다. 인증서는 certbot 타이머가 자동 갱신하고 갱신 후 nginx를 reload합니다.
