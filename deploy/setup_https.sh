@@ -17,12 +17,12 @@ cp deploy/nginx/cyberfondo-acme.conf "$CONF_DIR/"
 nginx -t && systemctl reload nginx
 
 # 2) 인증서 발급 (이메일/약관 동의는 대화형으로 입력), 갱신 시 nginx 자동 reload
-certbot certonly --webroot -w "$WEBROOT" -d "$DOMAIN" \
+certbot certonly --webroot -w "$WEBROOT" -d "$DOMAIN" --keep-until-expiring \
     --deploy-hook "systemctl reload nginx"
 
-# 3) https(4080) 사이트 설정
+# 3) https(443) 사이트 설정
 cp deploy/nginx/cyberfondo.conf "$CONF_DIR/"
 nginx -t && systemctl reload nginx
 
-echo "완료: https://$DOMAIN:4080"
+echo "완료: https://$DOMAIN"
 echo "자동 갱신 확인: certbot renew --dry-run"
