@@ -108,13 +108,78 @@ async function loadData() {
   return data;
 }
 
-function awardName(rank, total) {
+const SECTIONS = [
+  { key: "total", title: "종합", rankKey: "rank_total" },
+  { key: "distance", title: "거리", rankKey: "rank_distance" },
+  { key: "elevation", title: "획득고도", rankKey: "rank_elevation" },
+];
+
+// 부문 수상자는 다른 순위표에서 빠져 있으므로, 순위가 하나뿐이면 그 부문 단독 상장으로 그림
+function soloSection(entry) {
+  const ranked = SECTIONS.filter((sec) => entry[sec.rankKey]);
+  return ranked.length === 1 ? ranked[0] : null;
+}
+
+function awardName(entry, total) {
+  const solo = soloSection(entry);
+  if (solo && solo.key === "distance") return "장 거 리 왕 상";
+  if (solo && solo.key === "elevation") return "산 악 왕 상";
+  const rank = entry.rank_total;
   if (!rank) return "완 주 상";
   if (rank === 1) return "대   상";
   if (rank <= 3) return "최 우 수 상";
   if (rank <= Math.max(10, Math.ceil(total * 0.1))) return "우 수 상";
   return "완 주 상";
 }
+
+// ---- 메달 -----------------------------------------------------------------
+
+const MEDAL = {
+  1: ["#fff3b8", "#e0b52c", "#8f6a06"],
+  2: ["#ffffff", "#c3c8ce", "#6f767e"],
+  3: ["#ffd9b8", "#c07a3e", "#6e3f17"],
+};
+
+function drawMedal(ctx, cx, cy, r, rank, ribbon) {
+  const [hi, mid, dark] = MEDAL[rank];
+  ctx.save();
+  if (ribbon) {
+    const rw = r * 0.55, rh = r * 1.5;
+    [[-1, "#b3262d"], [1, "#23345c"]].forEach(([dir, color]) => {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(cx + dir * r * 0.15, cy - r * 0.6);
+      ctx.lineTo(cx + dir * (r * 0.15 + rw), cy - r * 0.6 - rh);
+      ctx.lineTo(cx + dir * (r * 0.15 + rw * 2), cy - r * 0.6 - rh);
+      ctx.lineTo(cx + dir * (r * 0.15 + rw), cy - r * 0.6);
+      ctx.closePath();
+      ctx.fill();
+    });
+  }
+  const g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.1, cx, cy, r);
+  g.addColorStop(0, hi);
+  g.addColorStop(0.55, mid);
+  g.addColorStop(1, dark);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = Math.max(1.5, r * 0.06);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 0.78, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(255,255,255,0.55)";
+  ctx.lineWidth = Math.max(1, r * 0.04);
+  ctx.stroke();
+  ctx.fillStyle = dark;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `800 ${r * 1.05}px ${SERIF}`;
+  ctx.fillText(String(rank), cx, cy + r * 0.06);
+  ctx.restore();
+}
+
 
 // ---- 직인 -----------------------------------------------------------------
 
@@ -200,7 +265,7 @@ function drawCertificate(entry, meta) {
 
   ctx.fillStyle = GOLD;
   ctx.font = `700 48px ${SERIF}`;
-  ctx.fillText(awardName(entry.rank_total, meta.totals.total), W / 2, 670);
+  ctx.fillText(awardName(entry, meta.totals.total), W / 2, 670);
 
   // 닉네임
   ctx.fillStyle = INK;
@@ -219,56 +284,103 @@ function drawCertificate(entry, meta) {
   // 성적
   const val = (v, unit, digits = 0) =>
     v == null ? "-" : `${v.toLocaleString("ko-KR", { maximumFractionDigits: digits })} ${unit}`;
-  const rows = [
-    ["종합순위", entry.rank_total, meta.totals.total, "점수", val(entry.score, "점", 2)],
-    ["거리순위", entry.rank_distance, meta.totals.distance, "주행거리", val(entry.distance, "km", 2)],
-    ["획득고도순위", entry.rank_elevation, meta.totals.elevation, "획득고도", val(entry.elevation, "m")],
-  ];
-  const top = 900, rowH = 104;
+  const values = {
+    total: val(entry.score, "점", 2),
+    distance: val(entry.distance, "km", 2),
+    elevation: val(entry.elevation, "m"),
+  };
+  const solo = soloSection(entry);
   ctx.strokeStyle = GOLD;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(left, top); ctx.lineTo(right, top);
-  ctx.moveTo(left, top + rowH * rows.length); ctx.lineTo(right, top + rowH * rows.length);
-  ctx.stroke();
-  ctx.lineWidth = 0.8;
-  ctx.setLineDash([4, 6]);
-  for (let i = 1; i < rows.length; i++) {
+
+  if (solo) {
+    // 부문 단독: 큰 메달 + 부문 순위 + 기록
+    const rank = entry[solo.rankKey];
+    const top = 900, bottom = 1250, cy = top + 235;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(left + 20, top + rowH * i);
-    ctx.lineTo(right - 20, top + rowH * i);
+    ctx.moveTo(left, top); ctx.lineTo(right, top);
+    ctx.moveTo(left, bottom); ctx.lineTo(right, bottom);
     ctx.stroke();
-  }
-  ctx.setLineDash([]);
 
-  rows.forEach(([name, rank, total, dataLabel, value], i) => {
-    const y = top + rowH * i + rowH / 2 + 14;
+    const medalX = left + 210;
+    if (MEDAL[rank]) drawMedal(ctx, medalX, cy, 100, rank, true);
+    const tx = medalX + 170;
     ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
     ctx.fillStyle = INK;
-    ctx.font = `700 38px ${SERIF}`;
-    ctx.fillText(name, left + 24, y);
-
-    const rankText = rank ? `${rank}위` : "-";
+    ctx.font = `700 46px ${SERIF}`;
+    const head = `${solo.title} 부문  `;
+    ctx.fillText(head, tx, cy - 30);
+    const headW = ctx.measureText(head).width;
     ctx.fillStyle = SEAL;
-    ctx.font = `800 50px ${SERIF}`;
-    ctx.fillText(rankText, left + 330, y);
-    const rankW = ctx.measureText(rankText).width;
-    ctx.fillStyle = SUBTLE;
-    ctx.font = `400 28px ${SERIF}`;
-    if (rank && total) ctx.fillText(` / ${total}명`, left + 330 + rankW, y);
-
-    ctx.textAlign = "right";
-    ctx.fillText(dataLabel, right - 240, y);
+    ctx.font = `800 84px ${SERIF}`;
+    ctx.fillText(`${rank}위`, tx + headW, cy - 30);
     ctx.fillStyle = INK;
-    ctx.font = `700 38px ${SERIF}`;
-    ctx.fillText(value, right - 24, y);
-  });
+    ctx.font = `800 64px ${SERIF}`;
+    ctx.fillText(values[solo.key], tx, cy + 55);
+    if (solo.key === "total") {
+      ctx.fillStyle = SUBTLE;
+      ctx.font = `400 32px ${SERIF}`;
+      ctx.fillText(`${values.distance}  ·  ${values.elevation}`, tx, cy + 100);
+    }
+  } else {
+    const rows = [
+      ["종합순위", entry.rank_total, meta.totals.total, "점수", values.total],
+      ["거리순위", entry.rank_distance, meta.totals.distance, "주행거리", values.distance],
+      ["획득고도순위", entry.rank_elevation, meta.totals.elevation, "획득고도", values.elevation],
+    ];
+    const top = 900, rowH = 104;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(left, top); ctx.lineTo(right, top);
+    ctx.moveTo(left, top + rowH * rows.length); ctx.lineTo(right, top + rowH * rows.length);
+    ctx.stroke();
+    ctx.lineWidth = 0.8;
+    ctx.setLineDash([4, 6]);
+    for (let i = 1; i < rows.length; i++) {
+      ctx.beginPath();
+      ctx.moveTo(left + 20, top + rowH * i);
+      ctx.lineTo(right - 20, top + rowH * i);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    rows.forEach(([name, rank, total, dataLabel, value], i) => {
+      const y = top + rowH * i + rowH / 2 + 14;
+      ctx.textAlign = "left";
+      ctx.fillStyle = INK;
+      ctx.font = `700 38px ${SERIF}`;
+      ctx.fillText(name, left + 24, y);
+
+      if (MEDAL[rank]) drawMedal(ctx, left + 300, y - 14, 26, rank, false);
+      const rankText = rank ? `${rank}위` : "-";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+      ctx.fillStyle = SEAL;
+      ctx.font = `800 50px ${SERIF}`;
+      ctx.fillText(rankText, left + 340, y);
+      const rankW = ctx.measureText(rankText).width;
+      ctx.fillStyle = SUBTLE;
+      ctx.font = `400 28px ${SERIF}`;
+      if (rank && total) ctx.fillText(` / ${total}명`, left + 340 + rankW, y);
+
+      ctx.textAlign = "right";
+      ctx.fillText(dataLabel, right - 240, y);
+      ctx.fillStyle = INK;
+      ctx.font = `700 38px ${SERIF}`;
+      ctx.fillText(value, right - 24, y);
+    });
+  }
 
   // 본문
   ctx.fillStyle = INK;
   ctx.textAlign = "center";
   ctx.font = `400 50px ${SERIF}`;
-  const body = ["위 사람은 2026 사이버폰도에 참가하여", "위와 같은 성적을 기록하였기에", "이 상장을 수여합니다."];
+  const body = [
+    solo ? `위 사람은 2026 사이버폰도 ${solo.title} 부문에서` : "위 사람은 2026 사이버폰도에 참가하여",
+    "위와 같은 성적을 기록하였기에",
+    "이 상장을 수여합니다.",
+  ];
   body.forEach((line, i) => ctx.fillText(line, W / 2, 1370 + i * 88));
 
   // 날짜
@@ -285,7 +397,7 @@ function drawCertificate(entry, meta) {
 }
 
 async function ensureFonts(entry) {
-  const text = "상장대최우수완주제호닉네임종합거리획득고도순위점수주행위사람은사이버폰도에참가하여와같은성적을기록하였기이를수여합니다년월일로드클갤러리之印명 /0123456789.,:-kmSCOPE" + entry.nickname;
+  const text = "장거리산악왕부문중상장대최우수완주제호닉네임종합거리획득고도순위점수주행위사람은사이버폰도에참가하여와같은성적을기록하였기이를수여합니다년월일로드클갤러리之印명 /0123456789.,:-kmSCOPE" + entry.nickname;
   await Promise.all([
     template.decode().catch(() => {}),
     document.fonts.load(`180px "Song Myung"`, text),
@@ -334,7 +446,8 @@ $("search").addEventListener("submit", async (e) => {
     btn.type = "button";
     btn.textContent = r.nickname;
     const small = document.createElement("small");
-    small.textContent = r.rank_total ? `종합 ${r.rank_total}위` : "";
+    const best = SECTIONS.find((sec) => r[sec.rankKey]);
+    small.textContent = best ? `${best.title} ${r[best.rankKey]}위` : "";
     btn.appendChild(small);
     btn.addEventListener("click", () => show(r));
     li.appendChild(btn);
