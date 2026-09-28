@@ -96,7 +96,6 @@ let data = null;
 let current = null;
 
 const $ = (id) => document.getElementById(id);
-const fmt = (n, d = 0) => Number(n).toLocaleString("ko-KR", { minimumFractionDigits: d, maximumFractionDigits: d });
 
 async function loadData() {
   if (data) return data;
@@ -107,6 +106,7 @@ async function loadData() {
 }
 
 function awardName(rank, total) {
+  if (!rank) return "완 주 상";
   if (rank === 1) return "대   상";
   if (rank <= 3) return "최 우 수 상";
   if (rank <= Math.max(10, Math.ceil(total * 0.1))) return "우 수 상";
@@ -270,7 +270,7 @@ function drawCertificate(entry, meta) {
   // 호수
   ctx.textAlign = "left";
   ctx.font = `400 34px ${SERIF}`;
-  ctx.fillText(`제 2026-${String(entry.rank_total).padStart(3, "0")} 호`, left, 330);
+  ctx.fillText(`제 2026-${String(meta.results.indexOf(entry) + 1).padStart(3, "0")} 호`, left, 330);
 
   // 제목
   ctx.textAlign = "center";
@@ -279,7 +279,7 @@ function drawCertificate(entry, meta) {
 
   ctx.fillStyle = NAVY;
   ctx.font = `700 50px ${SERIF}`;
-  ctx.fillText(awardName(entry.rank_total, meta.total), W / 2, 650);
+  ctx.fillText(awardName(entry.rank_total, meta.totals.total), W / 2, 650);
 
   // 성명
   ctx.fillStyle = INK;
@@ -295,10 +295,12 @@ function drawCertificate(entry, meta) {
   ctx.fillText(label, right - nickW, 790);
 
   // 성적표
+  const val = (v, unit, digits = 0) =>
+    v == null ? "-" : `${v.toLocaleString("ko-KR", { maximumFractionDigits: digits })} ${unit}`;
   const rows = [
-    ["종 합 순 위", entry.rank_total, "점수", `${fmt(entry.score, 1)} 점`],
-    ["거 리 순 위", entry.rank_distance, "주행거리", `${entry.distance.toLocaleString("ko-KR", { maximumFractionDigits: 2 })} km`],
-    ["획득고도순위", entry.rank_elevation, "획득고도", `${fmt(entry.elevation)} m`],
+    ["종 합 순 위", entry.rank_total, meta.totals.total, "점수", val(entry.score, "점", 2)],
+    ["거 리 순 위", entry.rank_distance, meta.totals.distance, "주행거리", val(entry.distance, "km", 2)],
+    ["획득고도순위", entry.rank_elevation, meta.totals.elevation, "획득고도", val(entry.elevation, "m")],
   ];
   const top = 880, rowH = 110;
   ctx.strokeStyle = GOLD;
@@ -308,7 +310,7 @@ function drawCertificate(entry, meta) {
   ctx.moveTo(left, top + rowH * rows.length); ctx.lineTo(right, top + rowH * rows.length);
   ctx.stroke();
   ctx.lineWidth = 1;
-  rows.forEach(([name, rank, dataLabel, value], i) => {
+  rows.forEach(([name, rank, total, dataLabel, value], i) => {
     const y = top + rowH * i + rowH / 2 + 14;
     if (i > 0) {
       ctx.beginPath();
@@ -323,11 +325,12 @@ function drawCertificate(entry, meta) {
 
     ctx.fillStyle = SEAL;
     ctx.font = `800 52px ${SERIF}`;
-    ctx.fillText(`${rank}위`, left + 330, y);
-    const rankW = ctx.measureText(`${rank}위`).width;
+    const rankText = rank ? `${rank}위` : "-";
+    ctx.fillText(rankText, left + 330, y);
+    const rankW = ctx.measureText(rankText).width;
     ctx.fillStyle = "#6b5e46";
     ctx.font = `400 30px ${SERIF}`;
-    ctx.fillText(` / ${meta.total}명`, left + 330 + rankW, y);
+    if (rank && total) ctx.fillText(` / ${total}명`, left + 330 + rankW, y);
 
     ctx.textAlign = "right";
     ctx.fillStyle = "#6b5e46";
@@ -381,11 +384,6 @@ async function show(entry) {
   $("result").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function maskUid(uid) {
-  if (!uid) return "";
-  return /^\d+\.\d+$/.test(uid) ? `(${uid})` : `(${uid.slice(0, 3)}***)`;
-}
-
 $("search").addEventListener("submit", async (e) => {
   e.preventDefault();
   $("result").style.display = "none";
@@ -404,7 +402,7 @@ $("search").addEventListener("submit", async (e) => {
 
   if (matches.length === 1) return show(matches[0]);
   if (!matches.length) {
-    $("msg").textContent = "검증 완료된 기록을 찾지 못했습니다. 닉네임을 확인해 주세요.";
+    $("msg").textContent = "최종 순위표에서 닉네임을 찾지 못했습니다. 닉네임을 확인해 주세요.";
     return;
   }
   $("msg").textContent = `${matches.length}명이 검색되었습니다. 본인을 선택해 주세요.`;
@@ -414,7 +412,7 @@ $("search").addEventListener("submit", async (e) => {
     btn.type = "button";
     btn.textContent = r.nickname;
     const small = document.createElement("small");
-    small.textContent = `${maskUid(r.uid)} · ${fmt(r.distance, 1)}km · ${fmt(r.elevation)}m`;
+    small.textContent = r.rank_total ? `종합 ${r.rank_total}위` : "";
     btn.appendChild(small);
     btn.addEventListener("click", () => show(r));
     li.appendChild(btn);
